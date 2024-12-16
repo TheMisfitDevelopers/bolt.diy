@@ -1,0 +1,14 @@
+# Modifications to the codebase
+1. log all of your changes to a file called .dataintegrityaudit.txt. Add that file name to the .gitignore file.
+2. be succinct and to the point. Make it a bullet list. 
+3. Include the date, time, and summary of the changes.
+4. If you are adding a new file, include the file name and a brief description of what it is.
+5. If you are deleting a file, include the file name and a brief description of what it was.
+6. If you are modifying a file, include the file name and a brief description of what you changed.
+7. If you are moving a file, include the file name and a brief description of what you moved it to.
+8. If you are renaming a file, include the file name and a brief description of what you renamed it to.
+9. If you are adding a new function, include the function name and a brief description of what it does.
+10. If you are deleting a function, include the function name and a brief description of what it was.
+11. If you are modifying a function, include the function name and a brief description of what you changed.
+12. If you are moving a function, include the function name and a brief description of what you moved it to.
+13. If you are renaming a function, include the function name and a brief description of what you renamed it to.

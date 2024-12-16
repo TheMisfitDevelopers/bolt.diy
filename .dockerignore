@@ -24,3 +24,6 @@ README.md
 logs
 dist-ssr
 .DS_Store
+
+# Ignore cursor rules
+.cursorrules

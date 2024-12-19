@@ -144,6 +144,21 @@ class LogStore {
       return matchesLevel && matchesCategory && matchesSearch;
     });
   }
+
+  // Add OpenRouter specific logging
+  logOpenRouter(message: string, data: Record<string, unknown> = {}): string {
+    return this.addLog(message, 'info', 'provider', {
+      type: 'openrouter',
+      ...data,
+    });
+  }
+
+  logOpenRouterError(message: string, error: unknown, context?: Record<string, unknown>): string {
+    return this.logError(message, error, {
+      provider: 'OpenRouter',
+      ...context,
+    });
+  }
 }
 
 export const logStore = new LogStore();

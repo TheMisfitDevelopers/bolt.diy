@@ -69,3 +69,22 @@ export function getBaseURL(cloudflareEnv: Env, provider: string) {
       return '';
   }
 }
+
+export function validateOpenRouterKey(apiKey: string) {
+  if (!apiKey?.startsWith('sk-or-v1-')) {
+    throw new Error('Invalid OpenRouter API key format. Key should start with "sk-or-v1-"');
+  }
+
+  return true;
+}
+
+export function getApiKey(provider: string, env: Env) {
+  switch (provider) {
+    case 'openai':
+      return env.OPENAI_API_KEY;
+    case 'anthropic':
+      return env.ANTHROPIC_API_KEY;
+    default:
+      return null;
+  }
+}

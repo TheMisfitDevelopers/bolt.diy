@@ -1,9 +1,9 @@
-import { type ActionFunctionArgs } from '@remix-run/cloudflare';
+import { type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/cloudflare';
 import { MAX_RESPONSE_SEGMENTS, MAX_TOKENS } from '~/lib/.server/llm/constants';
 import { CONTINUE_PROMPT } from '~/lib/.server/llm/prompts';
-import { streamText, type Messages, type StreamingOptions } from '~/lib/.server/llm/stream-text';
+import { streamText, type Messages, type StreamingOptions, type FileMap } from '~/lib/.server/llm/stream-text';
 import SwitchableStream from '~/lib/.server/llm/switchable-stream';
-import type { IProviderSetting } from '~/types/model';
+import { logStore } from '~/lib/stores/logs';
 
 export async function action(args: ActionFunctionArgs) {
   return chatAction(args);
@@ -30,22 +30,35 @@ function parseCookies(cookieHeader: string) {
 }
 
 async function chatAction({ context, request }: ActionFunctionArgs) {
-  const { messages, files } = await request.json<{
-    messages: Messages;
-    files: any;
-  }>();
-
-  const cookieHeader = request.headers.get('Cookie');
-
-  // Parse the cookie's value (returns an object or null if no cookie exists)
-  const apiKeys = JSON.parse(parseCookies(cookieHeader || '').apiKeys || '{}');
-  const providerSettings: Record<string, IProviderSetting> = JSON.parse(
-    parseCookies(cookieHeader || '').providers || '{}',
-  );
-
-  const stream = new SwitchableStream();
-
   try {
+    const { messages, files } = (await request.json()) as {
+      messages: Messages;
+      files: FileMap | undefined;
+    };
+    const cookieHeader = request.headers.get('Cookie');
+    const apiKeys = JSON.parse(parseCookies(cookieHeader || '').apiKeys || '{}');
+    const providerSettings = JSON.parse(parseCookies(cookieHeader || '').providers || '{}');
+
+    // Add logging to debug API keys and providers
+    logStore.logDebug('API configuration', {
+      hasOpenRouterKey: !!apiKeys.OpenRouter,
+      enabledProviders: providerSettings,
+    });
+
+    // Check if OpenRouter is enabled and has a key
+    if (!apiKeys.OpenRouter && !context.cloudflare.env.OPEN_ROUTER_API_KEY) {
+      throw new Error('OpenRouter API key is required');
+    }
+
+    /*
+     * Remove Anthropic key requirement
+     * if (!apiKeys.Anthropic && !context.cloudflare.env.ANTHROPIC_API_KEY) {
+     *   throw new Error('Anthropic API key is required');
+     * }
+     */
+
+    const stream = new SwitchableStream();
+
     const options: StreamingOptions = {
       toolChoice: 'none',
       onFinish: async ({ text: content, finishReason }) => {
@@ -91,22 +104,58 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
     return new Response(stream.readable, {
       status: 200,
       headers: {
-        contentType: 'text/plain; charset=utf-8',
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
   } catch (error: any) {
-    console.log(error);
+    logStore.logError('Chat API Error', error);
+    throw new Response(error.message || 'API Error', {
+      status: error.message?.includes('API key') ? 401 : 500,
+    });
+  }
+}
 
-    if (error.message?.includes('API key')) {
-      throw new Response('Invalid or missing API key', {
-        status: 401,
-        statusText: 'Unauthorized',
+// Move to top of file with other exports
+export async function handleOpenRouterRequest(url: string, options: RequestInit) {
+  try {
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      const errorData = (await response.json().catch(() => ({
+        error: { message: response.statusText },
+      }))) as { error?: { message?: string } };
+
+      throw new Error(`OpenRouter API error (${response.status}): ${errorData?.error?.message || response.statusText}`);
+    }
+
+    return response;
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      logStore.logError('OpenRouter API Error', error, {
+        url,
+        statusCode: (error as any).response?.status,
+        errorMessage: error.message,
       });
     }
 
-    throw new Response(null, {
-      status: 500,
-      statusText: 'Internal Server Error',
+    throw error;
+  }
+}
+
+// Add OPTIONS handler
+export async function loader({ request }: LoaderFunctionArgs) {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
     });
   }
+
+  return null;
 }

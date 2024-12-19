@@ -50,13 +50,15 @@ function getSystemInfo(): SystemInfo {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const extendedPerformance = performance as ExtendedPerformance;
+
   return {
     os: navigator.platform,
     browser: navigator.userAgent.split(' ').slice(-1)[0],
     screen: `${window.screen.width}x${window.screen.height}`,
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    memory: formatBytes(performance?.memory?.jsHeapSizeLimit || 0),
+    memory: formatBytes(extendedPerformance?.memory?.jsHeapSizeLimit || 0),
     cores: navigator.hardwareConcurrency || 0,
   };
 }
@@ -197,6 +199,14 @@ const checkProviderStatus = async (url: string | null, providerName: string): Pr
     };
   }
 };
+
+interface ExtendedPerformance extends Performance {
+  memory?: {
+    jsHeapSizeLimit: number;
+    totalJSHeapSize: number;
+    usedJSHeapSize: number;
+  };
+}
 
 export default function DebugTab() {
   const { providers } = useSettings();
